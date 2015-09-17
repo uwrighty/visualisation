@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="http://d3js.org/d3.v3.min.js"></script>
+
+  <style>
+
+	body {
+	  font: 10px sans-serif;
+	  text-align: center;
+	}
+	h1 {
+		
+		padding-bottom: 5px;
+	}
+
+	.axis path,
+	.axis line {
+	  fill: none;
+	  stroke: #000;
+	  shape-rendering: crispEdges;
+	}
+
+	.x.axis path {
+	  display: none;
+	}
+
+	.line {
+	  fill: none;
+	  stroke: steelblue;
+	  stroke-width: 1.5px;
+	}
+
+	.selected {
+		opacity: 1.0;
+	}
+      
+     div.airline_buttons {
+     	text-align: center;
+     	padding-bottom: 5px;
+      }
+
+     div.airline_buttons span {
+        background-color: rgb(251, 201, 127);
+        width: 60px;
+        padding: 10px;
+        margin: 7px;
+        opacity: 0.7;
+      }
+	</style>
+	<script type="text/javascript">
+
+	var parseDate = d3.time.format("%Y-%m-%d %X").parse;
+
+	function processData(data){
+		data.forEach(function(d){
+			d['monthofyear']= parseDate(d['monthofyear']);
+			d['avg_total_delay'] = +d['avg_total_delay'];				
+		});
+		draw(data);
+	}
+
+	function draw(data){
+
+		var margin = {top: 20, right: 80, bottom: 30, left: 50},
+		    width = 1260 - margin.left - margin.right,
+		    height = 400 - margin.top - margin.bottom;
+
+		var x = d3.time.scale()
+		    .range([0, width]);
+
+		var y = d3.scale.linear()
+		    .range([height, 0]);
+
+		var color = d3.scale.category10();
+
+		var xAxis = d3.svg.axis()
+		    .scale(x)
+		    .orient("bottom");
+
+		var yAxis = d3.svg.axis()
+		    .scale(y)
+		    .orient("left");
+
+		var line = d3.svg.line()
+		    .interpolate("basis")
+		    .x(function(d) { return x(d.monthofyear); })
+		    .y(function(d) { return y(d.avg_total_delay); });
+
+		var svg = d3.select("body").append("svg")
+		    .attr("width", width + margin.left + margin.right)
+		    .attr("height", height + margin.top + margin.bottom)
+		  .append("g")
+		    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");			
+
+		//Aggregate all the airline data together
+	    function agg_airlines(leaves) {
+
+	        var avg_delay = d3.mean(leaves, function(d) {
+	            return d.avg_total_delay;
+	        });
+
+	        return {
+	          'monthofyear' : leaves[0].monthofyear,
+	          'avg_total_delay' : +avg_delay,
+	          'carrier' : 'ALL',
+	        };
+	    }
+
+	    //handle the selection of an airline.
+	    function selectAirline(airline){
+	    	d3.selectAll('.line').classed({'selected':false});
+	    	d3.select('#line-'+airline.key).classed({'selected': true});
+	    }	
+
+	    var avg_all = d3.nest()
+	       .key(function(d) {
+	          return d.monthofyear;
+	       })
+	       .rollup(agg_airlines)
+	       .entries(data);    
+
+	    //must be a better way to do this!
+	    var temp = [{ key: 'ALL', values:[]}];
+
+	    avg_all.forEach(function(d){
+	    	temp[0].values.push(d.values)
+	    })
+	    avg_all = temp;
+
+	    //set the domain limits of the axis.
+	    x.domain(d3.extent(data, function(d) { return d.monthofyear; }));
+	  	y.domain([
+	    	d3.min(data, function(d) { return d.avg_total_delay }),
+	    	d3.max(data, function(d) { return d.avg_total_delay })
+	 	 ]);
+
+	  	//create airlines groupings and nest by airline
+	    var airlineKeys = d3.set(data.map(function(d){
+	    	return d.UniqueCarrier;
+	    }));
+
+	    color.domain(airlineKeys)
+
+		var airlines = d3.nest()
+			.key(function(d){
+				return d.UniqueCarrier;
+			})
+			.entries(data);	
+
+
+		//draw the plot
+		svg.append("g")
+		 	.attr("class", "x axis")
+		 	.attr("transform", "translate(0," + height + ")")
+			.call(xAxis);
+
+		svg.append("g")
+			.attr("class", "y axis")
+			.call(yAxis)
+		.append("text")
+			.attr("transform", "rotate(-90)")
+			.attr("y", 6)
+			.attr("dy", ".71em")
+			.style("text-anchor", "end")
+			.text("Average Delay (minutes)");	  
+
+		var airline = svg.selectAll(".airline")
+			.data(airlines)
+			.enter().append("g")
+			.attr("class", "airline");
+
+	  	airline.append("path")
+	  		.attr('id', function(d){return "line-"+d.key})
+	    	.attr("class", "line")
+	    	.attr('opacity', '0.05')
+	    	.attr("d", function(d) { 
+	    		return line(d.values); 
+	    	})
+        	.attr('title', function(d){
+        		return d.values[0].Description;
+        	})
+	    	.style("stroke", function(d) { return color(d.UniqueCarrier); })	
+	    	.on('mouseover', function(evt){
+	    		d3.select(this).attr('opacity', 1)
+	    	})
+	    	.on('mouseout', function(evt){
+	    		d3.select(this).attr('opacity', 0.05)
+	    	});
+
+	    var avg = svg.selectAll(".avg")
+	    	.data(avg_all)
+	    	.enter().append('g')
+	    	.attr('class', 'average');
+
+	    avg.append("path")
+	    	.attr("class", "line")
+	    	.attr("d", function(d){
+	    		return line(d.values);
+	    	})
+	    	.style('stroke', 'red');
+
+	   	avg.append('text')
+	   		.attr('class', 'label')
+	   		.attr('x', 1125)
+	   		.attr('y', 200)
+	   		.text('Average Delay')
+
+	    //buttons to show airline selected
+        var buttons = d3.select(".airline_buttons")
+        	.selectAll("div")
+        	.data(airlines)
+        	.enter()
+        	.append("span")
+        	.attr('title', function(d){
+        		return d.values[0].Description;
+        	})
+        	.text(function(d) {
+            	return d.key;
+        	});
+
+            buttons.on("click", function(d) {
+                d3.select(".airline_buttons")
+                  .selectAll("span")
+                  .transition()
+                  .duration(500)
+                  .style("color", "black")
+                  .style('opacity', 0.7)
+                  .style("background", "rgb(251, 201, 127)");
+
+                d3.select(this)
+                  .transition()
+                  .duration(500)
+                  .style("background", "steelblue")
+                  .style('opacity', 1)
+                  .style("color", "white");  
+                selectAirline(d) 		
+            });    	
+	 		
+	}
+	</script>
+</head>
+	<body>
+	  <script type="text/javascript">
+
+		//load data 
+		d3.json('./data/flight_by_carrier_by_month.json', processData);
+		</script>
+
+		<h1>US Airline Performance (2003 - 2008)</h1>
+		<div class="airline_buttons"></div>
+	</body>
+</html>
