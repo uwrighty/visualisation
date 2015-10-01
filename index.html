@@ -4,12 +4,18 @@
 <head>
   <meta charset="utf-8">
   <script src="http://d3js.org/d3.v3.min.js"></script>
+  <script src="lib/jquery-1.11.3.min.js"></script>
+  <script src="lib/colorbrewer.js"></script>
+  <script src="lib/underscore.js"></script>
+ <script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
+  <link rel="stylesheet" type="text/css" href="lib/colorbrewer.css">
 
   <style>
 
 	body {
 	  font: 10px sans-serif;
 	  text-align: center;
+	  padding-bottom: 10px;
 	}
 	h1 {
 		
@@ -23,11 +29,15 @@
 	  shape-rendering: crispEdges;
 	}
 
+	svg {
+		padding-bottom: 20px;
+	}
+
 	.x.axis path {
 	  display: none;
 	}
 
-	.line {
+	.a-line, .line {
 	  fill: none;
 	  stroke: steelblue;
 	  stroke-width: 1.5px;
@@ -49,10 +59,50 @@
         margin: 7px;
         opacity: 0.7;
       }
+
+	.d3-tip {
+	  line-height: 1;
+	  font-weight: bold;
+	  padding: 12px;
+	  background: rgba(0, 0, 0, 0.8);
+	  color: #fff;
+	  border-radius: 2px;
+	}
+
+	/* Creates a small triangle extender for the tooltip */
+	.d3-tip:after {
+	  box-sizing: border-box;
+	  display: inline;
+	  font-size: 10px;
+	  width: 100%;
+	  line-height: 1;
+	  color: rgba(0, 0, 0, 0.8);
+	  content: "\25BC";
+	  position: absolute;
+	  text-align: center;
+	}
+
+	/* Style northward tooltips differently */
+	.d3-tip.n:after {
+	  margin: -1px 0 0 0;
+	  top: 100%;
+	  left: 0;
+	}
+
+	#infoPanel {
+  		width: 350px;
+  		margin: 0 auto;
+  		font-size: medium;
+
+  		border: 10px solid rgb(251, 201, 127);
+  		border-radius: 25px;
+    	padding: 5px; 
+	}      
 	</style>
 	<script type="text/javascript">
 
 	var parseDate = d3.time.format("%Y-%m-%d %X").parse;
+	var formatDate = d3.time.format('%Y-%m');
 
 	function processData(data){
 		data.forEach(function(d){
@@ -74,7 +124,7 @@
 		var y = d3.scale.linear()
 		    .range([height, 0]);
 
-		var color = d3.scale.category10();
+		var color = d3.scale.category20();
 
 		var xAxis = d3.svg.axis()
 		    .scale(x)
@@ -84,17 +134,27 @@
 		    .scale(y)
 		    .orient("left");
 
+		var tip = d3.tip()
+		  .attr('class', 'd3-tip')
+		  .offset([-10, 0])
+		  .html(function(d) {
+		  	var date = formatDate(d.monthofyear)
+		    return "<strong>Average Delay:</strong> <span style='color:red'>" + d.avg_total_delay + "</span> <strong>Date:</strong> <span style='color:red'>" + date + "</span>";
+		  })
+
 		var line = d3.svg.line()
-		    .interpolate("basis")
+		    .interpolate("cardinal")
 		    .x(function(d) { return x(d.monthofyear); })
 		    .y(function(d) { return y(d.avg_total_delay); });
 
-		var svg = d3.select("body").append("svg")
+		var svg = d3.select("svg")
 		    .attr("width", width + margin.left + margin.right)
 		    .attr("height", height + margin.top + margin.bottom)
 		  .append("g")
 		    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");			
 
+		svg.call(tip);
+		
 		//Aggregate all the airline data together
 	    function agg_airlines(leaves) {
 
@@ -109,10 +169,54 @@
 	        };
 	    }
 
-	    //handle the selection of an airline.
+	    var selectedAirlines = [];
+
+	    //handle the selection of an airline. Handle styles and also bind tooltip event handlers.
 	    function selectAirline(airline){
-	    	d3.selectAll('.line').classed({'selected':false});
-	    	d3.select('#line-'+airline.key).classed({'selected': true});
+	    	selectedAirlines.push(airline);
+
+	    	while(selectedAirlines.length > 2){
+	    		selectedAirlines.shift();
+	    	}
+
+	    	//hide the other points
+	    	for (var i = airlineKeys.length - 1; i >= 0; i--) {
+	    		if(_.contains(selectedAirlines, airlineKeys[i])){
+	    			continue;
+	    		}
+	    		else{
+	    			$('#line-'+airlineKeys[i]).fadeTo('slow', 0.05);
+	    			$('.point-'+airlineKeys[i]).fadeTo('slow', 0);
+	    			$('.button-'+airlineKeys[i]).fadeTo('slow',0.7).css("color", 'black').css("background", "rgb(251, 201, 127)");
+	    			d3.selectAll('.point-'+airlineKeys[i]).on('mouseover', null)
+      			 	d3.selectAll('.point-'+airlineKeys[i]).on('mouseout', null);  
+	    		}
+	    	};
+
+	    	if(selectedAirlines.length == 1){
+	     		$('#line-'+selectedAirlines[0]).fadeTo('slow', 1);
+    			$('.point-'+selectedAirlines[0]).fadeTo('slow', 1);   
+    			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseover', tip.show)
+      			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseout', tip.hide); 	
+      			 updateInfoPanel(airline);
+
+	    	}else{
+	       		$('#line-'+selectedAirlines[1]).fadeTo('slow', 1);
+    			$('.point-'+selectedAirlines[1]).fadeTo('slow', 1); 
+    			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseover', tip.show)
+      			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseout', tip.hide); 
+      			 updateInfoPanel(airline); 	 		
+	    	}
+	    }
+
+	    //update the information panel with this airlines details.
+	    function updateInfoPanel(airline){
+			var currentRank = airline_rank.map(function(x) {return x.key; }).indexOf(airline);
+            d3.select('#airlineName').html(airline_rank[currentRank].values.name);
+            d3.select('#airlineRank').html(currentRank+1);
+            d3.select('#averageDelay').html(airline_rank[currentRank].values.total_delay);
+            d3.select('#averageDelay').html(airline_rank[currentRank].values.total_delay);
+            d3.select('#infoPanel').transition().duration(500).style("border-color", color(airline));
 	    }	
 
 	    var avg_all = d3.nest()
@@ -138,11 +242,12 @@
 	 	 ]);
 
 	  	//create airlines groupings and nest by airline
-	    var airlineKeys = d3.set(data.map(function(d){
+	    var airlineKeys = data.map(function(d){
 	    	return d.UniqueCarrier;
-	    }));
+	    });
 
-	    color.domain(airlineKeys)
+	    airlineKeys = _.unique(airlineKeys);
+	    color.domain(airlineKeys);  
 
 		var airlines = d3.nest()
 			.key(function(d){
@@ -175,20 +280,28 @@
 	  	airline.append("path")
 	  		.attr('id', function(d){return "line-"+d.key})
 	    	.attr("class", "line")
-	    	.attr('opacity', '0.05')
+	    	.style('opacity', 0.05)
 	    	.attr("d", function(d) { 
 	    		return line(d.values); 
 	    	})
         	.attr('title', function(d){
         		return d.values[0].Description;
         	})
-	    	.style("stroke", function(d) { return color(d.UniqueCarrier); })	
-	    	.on('mouseover', function(evt){
-	    		d3.select(this).attr('opacity', 1)
-	    	})
-	    	.on('mouseout', function(evt){
-	    		d3.select(this).attr('opacity', 0.05)
+	    	.style("stroke", function(d) { 
+	    		return color(d.key); 
 	    	});
+
+	    var points = airline.selectAll(".point")
+	    	.data(function(d){return d.values;})
+	    	.enter().append("svg:circle")
+         		.attr("stroke", "black")
+         		.attr("stroke-width", "0.5px")
+         		.attr("class", function(d){ return "point point-"+d.UniqueCarrier})
+         		.style("opacity", 0)
+         		.attr("fill", function(d, i) { return color(d.UniqueCarrier)})
+         		.attr("cx", function(d, i) { return x(d.monthofyear) })
+         		.attr("cy", function(d, i) { return y(d.avg_total_delay) })
+         		.attr("r", function(d, i) { return 4 });
 
 	    var avg = svg.selectAll(".avg")
 	    	.data(avg_all)
@@ -196,10 +309,11 @@
 	    	.attr('class', 'average');
 
 	    avg.append("path")
-	    	.attr("class", "line")
+	    	.attr("class", "a-line")
 	    	.attr("d", function(d){
 	    		return line(d.values);
 	    	})
+	    	.style("stroke-dasharray", "2,4")
 	    	.style('stroke', 'red');
 
 	   	avg.append('text')
@@ -208,36 +322,57 @@
 	   		.attr('y', 200)
 	   		.text('Average Delay')
 
-	    //buttons to show airline selected
-        var buttons = d3.select(".airline_buttons")
-        	.selectAll("div")
-        	.data(airlines)
-        	.enter()
-        	.append("span")
-        	.attr('title', function(d){
-        		return d.values[0].Description;
-        	})
-        	.text(function(d) {
-            	return d.key;
-        	});
 
-            buttons.on("click", function(d) {
-                d3.select(".airline_buttons")
-                  .selectAll("span")
-                  .transition()
-                  .duration(500)
-                  .style("color", "black")
-                  .style('opacity', 0.7)
-                  .style("background", "rgb(251, 201, 127)");
 
-                d3.select(this)
-                  .transition()
-                  .duration(500)
-                  .style("background", "steelblue")
-                  .style('opacity', 1)
-                  .style("color", "white");  
-                selectAirline(d) 		
-            });    	
+	    var airline_rank = d3.nest()
+	    	.key(function(d){
+	    		return d.UniqueCarrier;
+	    	})
+			.rollup(function(leaves){return {"name":leaves[0].Description,"total_delay":d3.mean(leaves, function(d){return d.avg_total_delay})}})
+			.entries(data);
+
+		airline_rank = _.sortBy(airline_rank, function(d){
+			return d.values.total_delay;
+		});
+
+        var currentRank = airline_rank.length -1;
+        //Animation.
+        var rank_interval = setInterval(function() {
+
+            selectAirline(airline_rank[currentRank].key);
+            d3.select('#airlineName').html(airline_rank[currentRank].values.name);
+            d3.select('#airlineRank').html(currentRank+1);
+            d3.select('#averageDelay').html(airline_rank[currentRank].values.total_delay);
+            currentRank--;
+            if(currentRank < 0) {
+                clearInterval(rank_interval);
+                	    //buttons to show airline selected
+		        var buttons = d3.select(".airline_buttons")
+		        	.selectAll("div")
+		        	.data(airline_rank)
+		        	.enter()
+		        	.append("span")
+		        	.attr("class", function(d){return "button-"+d.key})
+		        	.attr('title', function(d){
+		        		return d.values.name;
+		        	})
+		        	.text(function(d) {
+		            	return d.key;
+		        	});
+
+		            buttons.on("click", function(d) {
+		                d3.select(this)
+		                  .transition()
+		                  .duration(500)
+		                  .style("background", function(d) { 
+			    				return color(d.key); 
+			    		  })
+		                  .style('opacity', 1)
+		                  .style("color", "white");  
+		                selectAirline(d.key) 		
+		            });  
+            }
+        }, 2000);  	
 	 		
 	}
 	</script>
@@ -251,5 +386,11 @@
 
 		<h1>US Airline Performance (2003 - 2008)</h1>
 		<div class="airline_buttons"></div>
+		<svg></svg>
+		<div id="infoPanel">
+			<p><strong>Airline:</strong><span id='airlineName'></span></p>
+			<p><strong>Rank:</strong><span id='airlineRank'></span></p>
+			<p><strong>2003-2008 average delay:</strong><span id='averageDelay'></span></p>
+		</div>
 	</body>
 </html>
