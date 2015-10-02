@@ -53,6 +53,17 @@ Feedback in person from J. Messer  22nd Sepetember 2015
 
 * Looks cool, how about more detail about the airlines is displayed when you click on one?
 
+
+Visualisation after first set of feedback:
+
+http://bl.ocks.org/uwrighty/raw/f40da3aa6e4dd839f9a5/
+
+
+Feedback in person my B. Lewis 02 October 2015.
+* Maybe the information for both of the visible series should be presented at the same time?
+* could the button be better at the bottom?
+* The label values should be rounded.
+
 ----------------
 
 Work post feedback
@@ -65,6 +76,8 @@ Increase the transition duration time.
 Provide a story once the page first loads by stepping through the worst to best performing airlines in turn.
 Provided detail on hover 
 Organised the button in performance rank
+--version 3.
+Dynamically create the information div and append to the DOM.
 
 #Resources
 list any sources you consulted to create your visualization

@@ -52,7 +52,7 @@
      	padding-bottom: 5px;
       }
 
-     div.airline_buttons span {
+     div.airlineButtons span {
         background-color: rgb(251, 201, 127);
         width: 60px;
         padding: 10px;
@@ -89,14 +89,47 @@
 	  left: 0;
 	}
 
-	#infoPanel {
-  		width: 350px;
+	#infoPane{
+		display: inline-flex;
+	}
+
+	.infoPanel {
+		width:500px;
+	}
+
+	.rank {
+		float: left;
+    	font-weight: lighter;
+    	font-size: 6em;
+    	position: absolute;
+	}
+
+	.airlineButtons{
+		padding-top: 30px;
+	}
+
+	.rankLabel{
+		float: left;
+    	font-size: x-small;
+	}
+
+	.panelValues{
+		text-align: justify;
+    	padding-left: 125px
+	}
+
+	.panelContent {
+  		min-width: 350px;
+  		max-width: 500px;
+  		min-height: 135px;
   		margin: 0 auto;
   		font-size: medium;
 
   		border: 10px solid rgb(251, 201, 127);
   		border-radius: 25px;
-    	padding: 5px; 
+    	padding-top: 10PX;
+    	PADDING-LEFT: 5PX;
+    	PADDING-BOTTOM: 20PX;
 	}      
 	</style>
 	<script type="text/javascript">
@@ -173,6 +206,9 @@
 
 	    //handle the selection of an airline. Handle styles and also bind tooltip event handlers.
 	    function selectAirline(airline){
+	    	if(_.contains(selectedAirlines, airlineKeys)){
+	    		return;
+	    	}
 	    	selectedAirlines.push(airline);
 
 	    	while(selectedAirlines.length > 2){
@@ -188,7 +224,11 @@
 	    			$('#line-'+airlineKeys[i]).fadeTo('slow', 0.05);
 	    			$('.point-'+airlineKeys[i]).fadeTo('slow', 0);
 	    			$('.button-'+airlineKeys[i]).fadeTo('slow',0.7).css("color", 'black').css("background", "rgb(251, 201, 127)");
-	    			d3.selectAll('.point-'+airlineKeys[i]).on('mouseover', null)
+	    			//$('.info-'+airlineKeys[i]).fadeTo('slow', 0).remove();
+	    			$('.info-'+airlineKeys[i]).fadeOut('slow', function(){
+	    				$('.info-'+airlineKeys[i]).remove();
+	    			});
+	    			d3.selectAll('.point-'+airlineKeys[i]).on('mouseover', null);
       			 	d3.selectAll('.point-'+airlineKeys[i]).on('mouseout', null);  
 	    		}
 	    	};
@@ -212,11 +252,37 @@
 	    //update the information panel with this airlines details.
 	    function updateInfoPanel(airline){
 			var currentRank = airline_rank.map(function(x) {return x.key; }).indexOf(airline);
-            d3.select('#airlineName').html(airline_rank[currentRank].values.name);
-            d3.select('#airlineRank').html(currentRank+1);
-            d3.select('#averageDelay').html(airline_rank[currentRank].values.total_delay);
-            d3.select('#averageDelay').html(airline_rank[currentRank].values.total_delay);
-            d3.select('#infoPanel').transition().duration(500).style("border-color", color(airline));
+			var panel = d3.select('#infoPane')
+				.append('div')
+				.attr('class', 'infoPanel info-'+airline)
+				.style('display', 'none')
+				.append('div')
+				.attr('class', 'panelContent')
+				.style('border-color', color(airline));
+			
+			panel.append('span')
+				.attr('class', 'rankLabel')
+				.text('Rank');
+			panel.append('div')
+				.attr('class', 'rank')
+				.text(currentRank+1);
+
+			panel = panel.append('div')
+				.attr('class', 'panelValues');
+			var p = panel.append('p');
+			p.append('strong').text('Airline: ');
+			p.append('span').text(airline_rank[currentRank].values.name);
+
+			p = panel.append('p');
+			p.append('strong').text('Average Delay: ');
+			p.append('span').text(airline_rank[currentRank].values.total_delay.toFixed(2) + " minutes");
+
+			p = panel.append('p');
+			p.append('strong').text('Total Flights: ');
+			p.append('span').text(airline_rank[currentRank].values.total_flights);
+			$('.info-'+airline).fadeIn(1000);
+
+
 	    }	
 
 	    var avg_all = d3.nest()
@@ -328,7 +394,11 @@
 	    	.key(function(d){
 	    		return d.UniqueCarrier;
 	    	})
-			.rollup(function(leaves){return {"name":leaves[0].Description,"total_delay":d3.mean(leaves, function(d){return d.avg_total_delay})}})
+			.rollup(function(leaves){
+				return {
+					"name":leaves[0].Description, 
+					"total_flights":d3.sum(leaves, function(d){return d.flights}),
+					"total_delay":d3.mean(leaves, function(d){return d.avg_total_delay})}})
 			.entries(data);
 
 		airline_rank = _.sortBy(airline_rank, function(d){
@@ -340,14 +410,11 @@
         var rank_interval = setInterval(function() {
 
             selectAirline(airline_rank[currentRank].key);
-            d3.select('#airlineName').html(airline_rank[currentRank].values.name);
-            d3.select('#airlineRank').html(currentRank+1);
-            d3.select('#averageDelay').html(airline_rank[currentRank].values.total_delay);
             currentRank--;
             if(currentRank < 0) {
                 clearInterval(rank_interval);
                 	    //buttons to show airline selected
-		        var buttons = d3.select(".airline_buttons")
+		        var buttons = d3.select(".airlineButtons")
 		        	.selectAll("div")
 		        	.data(airline_rank)
 		        	.enter()
@@ -385,12 +452,9 @@
 		</script>
 
 		<h1>US Airline Performance (2003 - 2008)</h1>
-		<div class="airline_buttons"></div>
 		<svg></svg>
-		<div id="infoPanel">
-			<p><strong>Airline:</strong><span id='airlineName'></span></p>
-			<p><strong>Rank:</strong><span id='airlineRank'></span></p>
-			<p><strong>2003-2008 average delay:</strong><span id='averageDelay'></span></p>
+		<div id="infoPane">
 		</div>
+		<div class="airlineButtons"></div>
 	</body>
 </html>
