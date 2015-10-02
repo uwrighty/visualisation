@@ -1,5 +1,5 @@
 # Summary
-This visulisation looks at US domestic flight data from 2003 - 2008. It looks at how the performance of different airlines differs offer time. The data has been aggregated by airline by month to reduce the datasets size. 
+This visulisation looks at US domestic flight data from 2003 - 2008. It looks at how the performance of different airlines differs offer time. The data has been aggregated by airline by month to reduce the datasets size. In later version I told the user the a story by running through the airlines by rank in an animation, then allowing them to explore the data afterwards.
 
 #Design 
 1. Dataset.
