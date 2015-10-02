@@ -78,6 +78,9 @@ Provided detail on hover
 Organised the button in performance rank
 --version 3.
 Dynamically create the information div and append to the DOM.
+Move buttons to bottom.
+Rounded values.
+Added total flights to info panel.
 
 #Resources
 list any sources you consulted to create your visualization
