@@ -15,7 +15,6 @@
 	body {
 	  font: 10px sans-serif;
 	  text-align: center;
-	  padding-bottom: 10px;
 	}
 	h1 {
 		
@@ -40,7 +39,7 @@
 	.a-line, .line {
 	  fill: none;
 	  stroke: steelblue;
-	  stroke-width: 1.5px;
+	  stroke-width: 2px;
 	}
 
 	.selected {
@@ -100,8 +99,22 @@
 	.rank {
 		float: left;
     	font-weight: lighter;
-    	font-size: 6em;
+    	font-size: 4em;
     	position: absolute;
+	}
+
+	#counter {
+		float: left;
+    	font-weight: lighter;
+    	font-size: 4em;
+    	position: absolute;
+	}
+
+	.countdownPanel {
+		display: flex;
+	    position: relative;
+	    left: 250px;
+	    top: 80px;
 	}
 
 	.airlineButtons{
@@ -113,38 +126,152 @@
     	font-size: x-small;
 	}
 
+	#airline{
+		padding-top: 10px;
+    	padding-left: 50px;
+    	font-size: 2em;
+	}
+
 	.panelValues{
 		text-align: justify;
-    	padding-left: 125px
+    	padding-left: 85px
 	}
 
 	.panelContent {
-  		min-width: 350px;
-  		max-width: 500px;
-  		min-height: 135px;
-  		margin: 0 auto;
-  		font-size: medium;
+	    min-width: 270px;
+	    max-width: 500px;
+	    min-height: 90px;
+	    margin: 0 auto;
+	    font-size: small;
+	    border: 10px solid rgb(251, 201, 127);
+	    border-radius: 25px;
+	    padding-top: 5PX;
+	    PADDING-LEFT: 5PX;
+	    PADDING-BOTTOM: 5PX;
 
-  		border: 10px solid rgb(251, 201, 127);
-  		border-radius: 25px;
-    	padding-top: 10PX;
-    	PADDING-LEFT: 5PX;
-    	PADDING-BOTTOM: 20PX;
-	}      
+	}   
+
+	.businessGraphic {
+		float:right;
+		position: relative;
+		top: -90px;
+	}
+
 	</style>
 	<script type="text/javascript">
 
 	var parseDate = d3.time.format("%Y-%m-%d %X").parse;
 	var formatDate = d3.time.format('%Y-%m');
+	var businessData = {};
+	var busColor = d3.scale.ordinal()
+		.range(["#b30000", "#e34a33","#fc8d59", "#fdcc8a", "#fef0d9"]);
 
 	function processData(data){
 		data.forEach(function(d){
 			d['monthofyear']= parseDate(d['monthofyear']);
 			d['avg_total_delay'] = +d['avg_total_delay'];				
 		});
-		draw(data);
+		loadBusynessData(data);
 	}
 
+	function loadBusynessData(data){
+		d3.json('./data/flight_by_carrier_business_proportion.json', function(da){
+			businessData = da;
+
+			busColor.domain(d3.keys(businessData[0]).filter(function(key) { return key !== "UniqueCarrier"; }));
+
+			businessData.forEach(function(d) {
+			    var y0 = 0;
+			    d.busyness = busColor.domain().map(function(name) { return {name: name, y0: y0, y1: y0 += +d[name]}; });
+			  	d.total = d.busyness[d.busyness.length - 1].y1;
+			  });
+
+
+			draw(data);
+		});
+	}
+
+	//draw the stacked bar visualisation to describe business.
+	function drawStackedBar(data, airline){
+
+		//filter the data for the airline we are intrested in.
+
+		var margin = {top: 5, right: 5 , bottom: 5, left: 5},
+		    width = 75 - margin.left - margin.right,
+		    height = 75 - margin.top - margin.bottom;
+
+		var x = d3.scale.ordinal()
+		    .rangeRoundBands([0, width], .1);
+
+		var y = d3.scale.linear()
+		    .rangeRound([height, 0]);
+
+		var xAxis = d3.svg.axis()
+		    .scale(x)
+		    .orient("bottom");
+
+		var yAxis = d3.svg.axis()
+		    .scale(y)
+		    .orient("left")
+		    .tickFormat(d3.format(".2s"));		
+
+		var tip = d3.tip()
+		  .attr('class', 'd3-tip')
+		  .offset([-10, 0])
+		  .html(function(d) {
+		  	var total = d.y1 - d.y0;
+		    return "<h4>Proportion of flights from busy airports:</h4><strong>Busyness:</strong> <span style='color:red'>" + d.name + "</span> <strong>Proportion:</strong> <span style='color:red'>" + total + "</span>";
+		  })		    
+
+	    var svg = d3.select(".info-"+airline).select('div').append("svg")
+		    .attr("width", width + margin.left + margin.right)
+		    .attr("height", height + margin.top + margin.bottom)
+		    .attr('class', 'businessGraphic')
+		  .append("g")
+		    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+		  x.domain(data.map(function(d) { return x.UniqueCarrier; }));
+  			y.domain([0, d3.max(data, function(d) { return d.total; })]);
+
+		  svg.append("g")
+		      .attr("class", "x axis")
+		      .attr("transform", "translate(0," + height + ")")
+		      .call(xAxis);
+
+		  svg.append("g")
+		      .attr("class", "y axis")
+		      .call(yAxis)
+		    .append("text")
+		      .attr("transform", "rotate(-90)")
+		      .attr("y", 6)
+		      .attr("dy", ".71em")
+		      .style("text-anchor", "end")
+		      .text("Busyness");
+
+		  var airline = svg.selectAll(".airline")
+		      .data(data)
+		    .enter().append("g")
+		    	.filter(function(d) { 
+		    		return d.UniqueCarrier == airline; 
+		    	})
+		      	.attr("class", "g")
+		      	.attr("transform", function(d) { return "translate(" + x(d.name) + ",0)"; });
+
+		  airline.selectAll("rect")
+		      .data(function(d) { return d.busyness; })
+		    .enter().append("rect")
+	      		.attr("width", x.rangeBand())
+	      		.attr("y", function(d) { return y(d.y1); })
+	      		.attr("height", function(d) { return y(d.y0) - y(d.y1); })
+	      		.style("fill", function(d) { return busColor(d.name); })
+	      		.on('mouseover', tip.show)
+      			.on('mouseout', tip.hide); 
+
+	      svg.call(tip); 
+	}
+
+
+	// draw the main visualisation and controls
 	function draw(data){
 
 		var margin = {top: 20, right: 80, bottom: 30, left: 50},
@@ -206,7 +333,8 @@
 
 	    //handle the selection of an airline. Handle styles and also bind tooltip event handlers.
 	    function selectAirline(airline){
-	    	if(_.contains(selectedAirlines, airlineKeys)){
+
+	    	if(_.contains(selectedAirlines, airline)){
 	    		return;
 	    	}
 	    	selectedAirlines.push(airline);
@@ -247,42 +375,52 @@
       			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseout', tip.hide); 
       			 updateInfoPanel(airline); 	 		
 	    	}
+
+
 	    }
 
 	    //update the information panel with this airlines details.
 	    function updateInfoPanel(airline){
 			var currentRank = airline_rank.map(function(x) {return x.key; }).indexOf(airline);
-			var panel = d3.select('#infoPane')
-				.append('div')
-				.attr('class', 'infoPanel info-'+airline)
-				.style('display', 'none')
-				.append('div')
-				.attr('class', 'panelContent')
-				.style('border-color', color(airline));
-			
-			panel.append('span')
-				.attr('class', 'rankLabel')
-				.text('Rank');
-			panel.append('div')
-				.attr('class', 'rank')
-				.text(currentRank+1);
+			d3.select('#counter').text(currentRank + 1);
+			d3.select('#airline').text(airline_rank[currentRank].values.name);
 
-			panel = panel.append('div')
-				.attr('class', 'panelValues');
-			var p = panel.append('p');
-			p.append('strong').text('Airline: ');
-			p.append('span').text(airline_rank[currentRank].values.name);
+			if(!animation){
+				var panel = d3.select('#infoPane')
+					.append('div')
+					.attr('class', 'infoPanel info-'+airline)
+					.style('display', 'none')
+					.append('div')
+					.attr('class', 'panelContent')
+					.on('mouseover', pause)
+	      			.on('mouseout', resume)
+					.style('border-color', color(airline));
 
-			p = panel.append('p');
-			p.append('strong').text('Average Delay: ');
-			p.append('span').text(airline_rank[currentRank].values.total_delay.toFixed(2) + " minutes");
+				
+				panel.append('span')
+					.attr('class', 'rankLabel')
+					.text('Rank');
+				panel.append('div')
+					.attr('class', 'rank')
+					.text(currentRank+1);
 
-			p = panel.append('p');
-			p.append('strong').text('Total Flights: ');
-			p.append('span').text(airline_rank[currentRank].values.total_flights);
-			$('.info-'+airline).fadeIn(1000);
+				panel = panel.append('div')
+					.attr('class', 'panelValues');
+				var p = panel.append('p');
+				p.append('strong').text('Airline: ');
+				p.append('span').text(airline_rank[currentRank].values.name);
 
+				p = panel.append('p');
+				p.append('strong').text('Average Delay: ');
+				p.append('span').text(airline_rank[currentRank].values.total_delay.toFixed(2) + " minutes");
 
+				p = panel.append('p');
+				p.append('strong').text('Total Flights: ');
+				p.append('span').text(airline_rank[currentRank].values.total_flights);
+				$('.info-'+airline).fadeIn(1000);
+
+				drawStackedBar(businessData, airline);
+			}
 	    }	
 
 	    var avg_all = d3.nest()
@@ -321,7 +459,6 @@
 			})
 			.entries(data);	
 
-
 		//draw the plot
 		svg.append("g")
 		 	.attr("class", "x axis")
@@ -353,6 +490,21 @@
         	.attr('title', function(d){
         		return d.values[0].Description;
         	})
+	    	.on('mouseover', function(evt){
+	    		d3.select(this).style('opacity', 1);
+	    	})
+	    	.on('mouseout', function(d){
+		    	var ele = d3.select(this);
+		    	if(_.contains(selectedAirlines, d.key)){
+		    		return;
+		    	}
+		    	else{
+		    		ele.style('opacity', 0.05);
+		    	}	    			
+	    	})
+	    	.on('click', function(d){
+	    		selectAirline(d.key);
+	    	})
 	    	.style("stroke", function(d) { 
 	    		return color(d.key); 
 	    	});
@@ -405,41 +557,35 @@
 			return d.values.total_delay;
 		});
 
+		//Animation.
         var currentRank = airline_rank.length -1;
-        //Animation.
-        var rank_interval = setInterval(function() {
+		var rank_interval;
+		var animation = true;
+
+		//pause the animation.
+		function pause(){
+			clearInterval(rank_interval);
+		}
+
+		//resume the animation
+		function resume() {
+			rank_interval = setInterval(function() {
 
             selectAirline(airline_rank[currentRank].key);
             currentRank--;
             if(currentRank < 0) {
                 clearInterval(rank_interval);
-                	    //buttons to show airline selected
-		        var buttons = d3.select(".airlineButtons")
-		        	.selectAll("div")
-		        	.data(airline_rank)
-		        	.enter()
-		        	.append("span")
-		        	.attr("class", function(d){return "button-"+d.key})
-		        	.attr('title', function(d){
-		        		return d.values.name;
-		        	})
-		        	.text(function(d) {
-		            	return d.key;
-		        	});
-
-		            buttons.on("click", function(d) {
-		                d3.select(this)
-		                  .transition()
-		                  .duration(500)
-		                  .style("background", function(d) { 
-			    				return color(d.key); 
-			    		  })
-		                  .style('opacity', 1)
-		                  .style("color", "white");  
-		                selectAirline(d.key) 		
-		            });  
+                animation = false;
+                selectedAirlines = [];
+                selectAirline(airline_rank[1].key);                
+                selectAirline(airline_rank[0].key);
             }
-        }, 2000);  	
+        }, 4000);  	
+		}
+
+
+
+        resume();
 	 		
 	}
 	</script>
@@ -452,6 +598,12 @@
 		</script>
 
 		<h1>US Airline Performance (2003 - 2008)</h1>
+		<div class='countdownPanel'>
+			<span class="RankLabel">Rank</span>
+			<div id='counter'></div>
+			<div id='airline'>As ranked by average delay</div>
+		</div>
+
 		<svg></svg>
 		<div id="infoPane">
 		</div>
