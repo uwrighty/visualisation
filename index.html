@@ -570,7 +570,7 @@
 		//resume the animation
 		function resume() {
 			rank_interval = setInterval(function() {
-
+			d3.selectAll('.vizRankLabel').style('display', 'block');
             selectAirline(airline_rank[currentRank].key);
             currentRank--;
             if(currentRank < 0) {
@@ -599,9 +599,9 @@
 
 		<h1>US Airline Performance (2003 - 2008)</h1>
 		<div class='countdownPanel'>
-			<span class="RankLabel">Rank</span>
-			<div id='counter'></div>
-			<div id='airline'>As ranked by average delay</div>
+			<span id="vizRankLabel" class="RankLabel vizRankLabel" style="display:none">Rank</span>
+			<div id='counter' class="vizRankLabel" style="display:none"></div>
+			<div id='airline'>How does your airline compare, as ranked by average flight delay?</div>
 		</div>
 
 		<svg></svg>
