@@ -175,7 +175,7 @@
 	}
 
 	function loadBusynessData(data){
-		d3.json('./data/flight_by_carrier_business_proportion.json', function(da){
+		d3.json('data/flight_by_carrier_business_proportion.json', function(da){
 			businessData = da;
 
 			busColor.domain(d3.keys(businessData[0]).filter(function(key) { return key !== "UniqueCarrier"; }));
@@ -594,7 +594,7 @@
 	  <script type="text/javascript">
 
 		//load data 
-		d3.json('./data/flight_by_carrier_by_month.json', processData);
+		d3.json('data/flight_by_carrier_by_month.json', processData);
 		</script>
 
 		<h1>US Airline Performance (2003 - 2008)</h1>
