@@ -114,6 +114,11 @@ Increase the animation delay.
 Add a stacked bar of number of flights from busy airports as additional bit of information for comparison.
 Add a simple label on the visualisation during animation, rather than information panels.
 
+version 4:
+Added navigation buttons
+Added button to skip animation
+Added more comments to code.
+
 #Resources
 list any sources you consulted to create your visualization
 

@@ -165,7 +165,10 @@
 	var businessData = {};
 	var busColor = d3.scale.ordinal()
 		.range(["#b30000", "#e34a33","#fc8d59", "#fdcc8a", "#fef0d9"]);
+	//color scale for airlines;
+	var color;
 
+	//handle the airline performance data and then load the business data.
 	function processData(data){
 		data.forEach(function(d){
 			d['monthofyear']= parseDate(d['monthofyear']);
@@ -174,6 +177,10 @@
 		loadBusynessData(data);
 	}
 
+	//Accesor for tooltips
+	var tip;
+
+	//load the busyness data.
 	function loadBusynessData(data){
 		d3.json('data/flight_by_carrier_business_proportion.json', function(da){
 			businessData = da;
@@ -191,18 +198,158 @@
 		});
 	}
 
+	//Animation.
+    var currentRank = 22;
+	var rank_interval;
+	var animation = true;
+
+	//hold ranking information
+	var airline_rank;
+
+	//airline keys
+	var airlineKeys;
+
+
+	//pause the animation.
+	function pause(){
+		clearInterval(rank_interval);
+	}
+
+	//resume the animation
+	function resume() {
+		rank_interval = setInterval(function() {
+		d3.selectAll('.vizRankLabel').style('display', 'block');
+        selectAirline(airline_rank[currentRank].key);
+        currentRank--;
+        if(currentRank < 0) {
+			clearAnimation();
+        }
+    	}, 4000);  	
+	}
+
+	//clear the animation
+	function clearAnimation(){
+        clearInterval(rank_interval);
+        animation = false;
+        selectedAirlines = [];
+        selectAirline(airline_rank[currentRank+1].key);                
+        selectAirline(airline_rank[currentRank].key);	
+        $('#navigationButtons').show();		
+        $('#skipanimation').hide()
+	}
+
+	//allow user to navigate to prev/next airline
+	function navigateToAirline(pos){
+		currentRank = currentRank + pos;
+		selectAirline(airline_rank[currentRank].key);
+	}	
+
+	//selected airlines
+	var selectedAirlines = [];
+
+    //handle the selection of an airline. Handle styles and also bind tooltip event handlers.
+    function selectAirline(airline){
+
+    	updateInfoPanel(airline);
+    	if(_.contains(selectedAirlines, airline)){
+    		//switch the selected around.
+    		selectedAirlines.push(selectedAirlines.shift());
+    		return;
+    	}
+    	selectedAirlines.push(airline);
+
+    	while(selectedAirlines.length > 2){
+    		selectedAirlines.shift();
+    	}
+
+    	//hide the other points
+    	for (var i = airlineKeys.length - 1; i >= 0; i--) {
+    		if(_.contains(selectedAirlines, airlineKeys[i])){
+    			continue;
+    		}
+    		else{
+    			$('#line-'+airlineKeys[i]).fadeTo('slow', 0.05);
+    			$('.point-'+airlineKeys[i]).fadeTo('slow', 0);
+    			$('.button-'+airlineKeys[i]).fadeTo('slow',0.7).css("color", 'black').css("background", "rgb(251, 201, 127)");
+    			//$('.info-'+airlineKeys[i]).fadeTo('slow', 0).remove();
+    			$('.info-'+airlineKeys[i]).fadeOut('slow', function(){
+    				$('.info-'+airlineKeys[i]).remove();
+    			});
+    			d3.selectAll('.point-'+airlineKeys[i]).on('mouseover', null);
+  			 	d3.selectAll('.point-'+airlineKeys[i]).on('mouseout', null);  
+    		}
+    	};
+
+    	//fade in the selection.
+    	if(selectedAirlines.length == 1){
+     		$('#line-'+selectedAirlines[0]).fadeTo('slow', 1);
+			$('.point-'+selectedAirlines[0]).fadeTo('slow', 1);   
+			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseover', tip.show)
+  			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseout', tip.hide); 	
+    	}else{
+       		$('#line-'+selectedAirlines[1]).fadeTo('slow', 1);
+			$('.point-'+selectedAirlines[1]).fadeTo('slow', 1); 
+			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseover', tip.show)
+  			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseout', tip.hide); 
+    	}
+    }
+
+    //update the information panel with this airlines details.
+    function updateInfoPanel(airline){
+		currentRank = airline_rank.map(function(x) {return x.key; }).indexOf(airline);
+		d3.select('#counter').text(currentRank + 1);
+		d3.select('#airline').text(airline_rank[currentRank].values.name);
+
+		//only show the panel if its not already rendered and the animation has ended.
+		if(!animation && $('.info-'+airline).length == 0){
+
+			//dynamically build the panel using attributes in the model.
+			var panel = d3.select('#infoPane')
+				.append('div')
+				.attr('class', 'infoPanel info-'+airline)
+				.style('display', 'none')
+				.append('div')
+				.attr('class', 'panelContent')
+				.style('border-color', color(airline));		
+			panel.append('span')
+				.attr('class', 'rankLabel')
+				.text('Rank');
+			panel.append('div')
+				.attr('class', 'rank')
+				.text(currentRank+1);
+
+			panel = panel.append('div')
+				.attr('class', 'panelValues');
+			var p = panel.append('p');
+			p.append('strong').text('Airline: ');
+			p.append('span').text(airline_rank[currentRank].values.name);
+
+			p = panel.append('p');
+			p.append('strong').text('Average Delay: ');
+			p.append('span').text(airline_rank[currentRank].values.total_delay.toFixed(2) + " minutes");
+
+			p = panel.append('p');
+			p.append('strong').text('Total Flights: ');
+			p.append('span').text(airline_rank[currentRank].values.total_flights);
+			$('.info-'+airline).fadeIn(1000);
+
+			//draw a stacked bar for this airline
+			drawStackedBar(businessData, airline);
+		}
+    }		
+
 	//draw the stacked bar visualisation to describe business.
 	function drawStackedBar(data, airline){
-
-		//filter the data for the airline we are intrested in.
-
+		//set the margin and size of the svg
 		var margin = {top: 5, right: 5 , bottom: 5, left: 5},
 		    width = 75 - margin.left - margin.right,
 		    height = 75 - margin.top - margin.bottom;
 
+		//scale for x axis
 		var x = d3.scale.ordinal()
 		    .rangeRoundBands([0, width], .1);
 
+		//scale for y axis
 		var y = d3.scale.linear()
 		    .rangeRound([height, 0]);
 
@@ -215,6 +362,7 @@
 		    .orient("left")
 		    .tickFormat(d3.format(".2s"));		
 
+		//tooltip for when hovering over chart.
 		var tip = d3.tip()
 		  .attr('class', 'd3-tip')
 		  .offset([-10, 0])
@@ -223,6 +371,7 @@
 		    return "<h4>Proportion of flights from busy airports:</h4><strong>Busyness:</strong> <span style='color:red'>" + d.name + "</span> <strong>Proportion:</strong> <span style='color:red'>" + total + "</span>";
 		  })		    
 
+		//dynamically build svg for this airline
 	    var svg = d3.select(".info-"+airline).select('div').append("svg")
 		    .attr("width", width + margin.left + margin.right)
 		    .attr("height", height + margin.top + margin.bottom)
@@ -230,6 +379,7 @@
 		  .append("g")
 		    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
+		  //set the x and y scales to the values in the domain
 		  x.domain(data.map(function(d) { return x.UniqueCarrier; }));
   			y.domain([0, d3.max(data, function(d) { return d.total; })]);
 
@@ -248,6 +398,7 @@
 		      .style("text-anchor", "end")
 		      .text("Busyness");
 
+		  //build the stacked bar for this airline
 		  var airline = svg.selectAll(".airline")
 		      .data(data)
 		    .enter().append("g")
@@ -271,20 +422,24 @@
 	}
 
 
-	// draw the main visualisation and controls
+	// draw the main line graph visualisation
 	function draw(data){
 
+		//margin and width and height for this viz.
 		var margin = {top: 20, right: 80, bottom: 30, left: 50},
 		    width = 1260 - margin.left - margin.right,
 		    height = 400 - margin.top - margin.bottom;
 
+		// x axis scale
 		var x = d3.time.scale()
 		    .range([0, width]);
 
+		// y axis scale
 		var y = d3.scale.linear()
 		    .range([height, 0]);
 
-		var color = d3.scale.category20();
+		//initalise our color scale which will be used for each airline in the data.
+		color = d3.scale.category20();
 
 		var xAxis = d3.svg.axis()
 		    .scale(x)
@@ -294,7 +449,8 @@
 		    .scale(y)
 		    .orient("left");
 
-		var tip = d3.tip()
+		//tooltip config when a point is hovered over.
+		tip = d3.tip()
 		  .attr('class', 'd3-tip')
 		  .offset([-10, 0])
 		  .html(function(d) {
@@ -302,11 +458,13 @@
 		    return "<strong>Average Delay:</strong> <span style='color:red'>" + d.avg_total_delay + "</span> <strong>Date:</strong> <span style='color:red'>" + date + "</span>";
 		  })
 
+		//Configure how lines will be created from the data.
 		var line = d3.svg.line()
 		    .interpolate("cardinal")
 		    .x(function(d) { return x(d.monthofyear); })
 		    .y(function(d) { return y(d.avg_total_delay); });
 
+		//initialise svg
 		var svg = d3.select("svg")
 		    .attr("width", width + margin.left + margin.right)
 		    .attr("height", height + margin.top + margin.bottom)
@@ -315,9 +473,8 @@
 
 		svg.call(tip);
 		
-		//Aggregate all the airline data together
+		//Aggregate all the airline data together so that we can show the average delay in total
 	    function agg_airlines(leaves) {
-
 	        var avg_delay = d3.mean(leaves, function(d) {
 	            return d.avg_total_delay;
 	        });
@@ -329,110 +486,13 @@
 	        };
 	    }
 
-	    var selectedAirlines = [];
-
-	    //handle the selection of an airline. Handle styles and also bind tooltip event handlers.
-	    function selectAirline(airline){
-
-	    	if(_.contains(selectedAirlines, airline)){
-	    		return;
-	    	}
-	    	selectedAirlines.push(airline);
-
-	    	while(selectedAirlines.length > 2){
-	    		selectedAirlines.shift();
-	    	}
-
-	    	//hide the other points
-	    	for (var i = airlineKeys.length - 1; i >= 0; i--) {
-	    		if(_.contains(selectedAirlines, airlineKeys[i])){
-	    			continue;
-	    		}
-	    		else{
-	    			$('#line-'+airlineKeys[i]).fadeTo('slow', 0.05);
-	    			$('.point-'+airlineKeys[i]).fadeTo('slow', 0);
-	    			$('.button-'+airlineKeys[i]).fadeTo('slow',0.7).css("color", 'black').css("background", "rgb(251, 201, 127)");
-	    			//$('.info-'+airlineKeys[i]).fadeTo('slow', 0).remove();
-	    			$('.info-'+airlineKeys[i]).fadeOut('slow', function(){
-	    				$('.info-'+airlineKeys[i]).remove();
-	    			});
-	    			d3.selectAll('.point-'+airlineKeys[i]).on('mouseover', null);
-      			 	d3.selectAll('.point-'+airlineKeys[i]).on('mouseout', null);  
-	    		}
-	    	};
-
-	    	if(selectedAirlines.length == 1){
-	     		$('#line-'+selectedAirlines[0]).fadeTo('slow', 1);
-    			$('.point-'+selectedAirlines[0]).fadeTo('slow', 1);   
-    			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseover', tip.show)
-      			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseout', tip.hide); 	
-      			 updateInfoPanel(airline);
-
-	    	}else{
-	       		$('#line-'+selectedAirlines[1]).fadeTo('slow', 1);
-    			$('.point-'+selectedAirlines[1]).fadeTo('slow', 1); 
-    			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseover', tip.show)
-      			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseout', tip.hide); 
-      			 updateInfoPanel(airline); 	 		
-	    	}
-
-
-	    }
-
-	    //update the information panel with this airlines details.
-	    function updateInfoPanel(airline){
-			var currentRank = airline_rank.map(function(x) {return x.key; }).indexOf(airline);
-			d3.select('#counter').text(currentRank + 1);
-			d3.select('#airline').text(airline_rank[currentRank].values.name);
-
-			if(!animation){
-				var panel = d3.select('#infoPane')
-					.append('div')
-					.attr('class', 'infoPanel info-'+airline)
-					.style('display', 'none')
-					.append('div')
-					.attr('class', 'panelContent')
-					.on('mouseover', pause)
-	      			.on('mouseout', resume)
-					.style('border-color', color(airline));
-
-				
-				panel.append('span')
-					.attr('class', 'rankLabel')
-					.text('Rank');
-				panel.append('div')
-					.attr('class', 'rank')
-					.text(currentRank+1);
-
-				panel = panel.append('div')
-					.attr('class', 'panelValues');
-				var p = panel.append('p');
-				p.append('strong').text('Airline: ');
-				p.append('span').text(airline_rank[currentRank].values.name);
-
-				p = panel.append('p');
-				p.append('strong').text('Average Delay: ');
-				p.append('span').text(airline_rank[currentRank].values.total_delay.toFixed(2) + " minutes");
-
-				p = panel.append('p');
-				p.append('strong').text('Total Flights: ');
-				p.append('span').text(airline_rank[currentRank].values.total_flights);
-				$('.info-'+airline).fadeIn(1000);
-
-				drawStackedBar(businessData, airline);
-			}
-	    }	
-
 	    var avg_all = d3.nest()
 	       .key(function(d) {
 	          return d.monthofyear;
 	       })
 	       .rollup(agg_airlines)
 	       .entries(data);    
-
-	    //must be a better way to do this!
 	    var temp = [{ key: 'ALL', values:[]}];
-
 	    avg_all.forEach(function(d){
 	    	temp[0].values.push(d.values)
 	    })
@@ -445,8 +505,8 @@
 	    	d3.max(data, function(d) { return d.avg_total_delay })
 	 	 ]);
 
-	  	//create airlines groupings and nest by airline
-	    var airlineKeys = data.map(function(d){
+	  	//create airlines groupings and nest by airline so that we have all data per series.
+	    airlineKeys = data.map(function(d){
 	    	return d.UniqueCarrier;
 	    });
 
@@ -480,6 +540,7 @@
 			.enter().append("g")
 			.attr("class", "airline");
 
+		//draw a path to represent all points for each airline. By default the line is hidden and when selected or hovered over displays. Onclick select this airline.
 	  	airline.append("path")
 	  		.attr('id', function(d){return "line-"+d.key})
 	    	.attr("class", "line")
@@ -509,6 +570,7 @@
 	    		return color(d.key); 
 	    	});
 
+	    //draw all points for each airline, by default these are hidden, and are displayed when the airline is selected.
 	    var points = airline.selectAll(".point")
 	    	.data(function(d){return d.values;})
 	    	.enter().append("svg:circle")
@@ -521,11 +583,11 @@
          		.attr("cy", function(d, i) { return y(d.avg_total_delay) })
          		.attr("r", function(d, i) { return 4 });
 
+        //draw the average delay trend on the visualisation to provide a reference point to compare other series to
 	    var avg = svg.selectAll(".avg")
 	    	.data(avg_all)
 	    	.enter().append('g')
 	    	.attr('class', 'average');
-
 	    avg.append("path")
 	    	.attr("class", "a-line")
 	    	.attr("d", function(d){
@@ -540,9 +602,8 @@
 	   		.attr('y', 200)
 	   		.text('Average Delay')
 
-
-
-	    var airline_rank = d3.nest()
+	   	//rank all airlines in order by their average delay, so that we can step through in order.
+	    airline_rank = d3.nest()
 	    	.key(function(d){
 	    		return d.UniqueCarrier;
 	    	})
@@ -557,34 +618,6 @@
 			return d.values.total_delay;
 		});
 
-		//Animation.
-        var currentRank = airline_rank.length -1;
-		var rank_interval;
-		var animation = true;
-
-		//pause the animation.
-		function pause(){
-			clearInterval(rank_interval);
-		}
-
-		//resume the animation
-		function resume() {
-			rank_interval = setInterval(function() {
-			d3.selectAll('.vizRankLabel').style('display', 'block');
-            selectAirline(airline_rank[currentRank].key);
-            currentRank--;
-            if(currentRank < 0) {
-                clearInterval(rank_interval);
-                animation = false;
-                selectedAirlines = [];
-                selectAirline(airline_rank[1].key);                
-                selectAirline(airline_rank[0].key);
-            }
-        }, 4000);  	
-		}
-
-
-
         resume();
 	 		
 	}
@@ -598,11 +631,16 @@
 		</script>
 
 		<h1>US Airline Performance (2003 - 2008)</h1>
+		<div id="navigationButtons" style="display:none">
+			<button type="button" onclick="navigateToAirline(-1)" title="prev"><</button>
+			<button type="button" onclick="navigateToAirline(1)" title="next">></button>
+		</div>
 		<div class='countdownPanel'>
 			<span id="vizRankLabel" class="RankLabel vizRankLabel" style="display:none">Rank</span>
 			<div id='counter' class="vizRankLabel" style="display:none"></div>
 			<div id='airline'>How does your airline compare, as ranked by average flight delay?</div>
 		</div>
+		<div><button id="skipanimation" onclick="clearAnimation(); $(this).hide()">Skip</button></div>
 
 		<svg></svg>
 		<div id="infoPane">
