@@ -118,6 +118,7 @@ version 4:
 Added navigation buttons
 Added button to skip animation
 Added more comments to code.
+Added code to toggle whether nav button can be triggered.
 
 #Resources
 list any sources you consulted to create your visualization

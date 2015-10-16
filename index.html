@@ -294,9 +294,22 @@
     	}
     }
 
+    //toggle the navigation buttons depending on the current selection.
+    function handleNavButtons(rank){
+	    d3.select('#navPrev').attr('disabled', null);
+		d3.select('#navNext').attr('disabled', null);	
+
+    	if(rank == 0){
+    		d3.select('#navPrev').attr('disabled', true);
+    	}else if(rank >= 22){
+    		d3.select('#navNext').attr('disabled', true);
+    	}
+    }
+
     //update the information panel with this airlines details.
     function updateInfoPanel(airline){
 		currentRank = airline_rank.map(function(x) {return x.key; }).indexOf(airline);
+		handleNavButtons(currentRank);
 		d3.select('#counter').text(currentRank + 1);
 		d3.select('#airline').text(airline_rank[currentRank].values.name);
 
@@ -632,8 +645,8 @@
 
 		<h1>US Airline Performance (2003 - 2008)</h1>
 		<div id="navigationButtons" style="display:none">
-			<button type="button" onclick="navigateToAirline(-1)" title="prev"><</button>
-			<button type="button" onclick="navigateToAirline(1)" title="next">></button>
+			<button id="navPrev" type="button" onclick="navigateToAirline(-1)" title="prev"><</button>
+			<button id="navNext" type="button" onclick="navigateToAirline(1)" title="next">></button>
 		</div>
 		<div class='countdownPanel'>
 			<span id="vizRankLabel" class="RankLabel vizRankLabel" style="display:none">Rank</span>
