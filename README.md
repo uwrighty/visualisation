@@ -131,3 +131,6 @@ http://d3js.org/ -d3 docs
 https://bimonitor.wordpress.com/2013/03/22/properties-and-best-uses-of-visual-encoding/ - info on visual encodings.
 
 http://bl.ocks.org/Caged/6476579 - tooltips
+
+http://www.storytellingwithdata.com/blog/2014/04/exploratory-vs-explanatory-analysis
+
