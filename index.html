@@ -209,7 +209,6 @@
 	//airline keys
 	var airlineKeys;
 
-
 	//pause the animation.
 	function pause(){
 		clearInterval(rank_interval);
@@ -247,22 +246,22 @@
 	//selected airlines
 	var selectedAirlines = [];
 
-    //handle the selection of an airline. Handle styles and also bind tooltip event handlers.
+    //handle the selection of an airline by displaying libe and points, and hiding others. Also bind tooltip event handlers.
     function selectAirline(airline){
 
     	updateInfoPanel(airline);
-    	if(_.contains(selectedAirlines, airline)){
-    		//switch the selected around.
-    		selectedAirlines.push(selectedAirlines.shift());
-    		return;
-    	}
-    	selectedAirlines.push(airline);
+    	selectedAirlines.unshift(airline);
 
     	while(selectedAirlines.length > 2){
-    		selectedAirlines.shift();
+    		selectedAirlines.pop();
     	}
 
-    	//hide the other points
+    	//When in animation mode only display the current airline so the visualisation doesnt get too busy.
+    	if(animation && selectedAirlines.length == 2){
+    		selectedAirlines.pop();
+    	}
+
+    	//Fade out the selection for ailines not selected
     	for (var i = airlineKeys.length - 1; i >= 0; i--) {
     		if(_.contains(selectedAirlines, airlineKeys[i])){
     			continue;
@@ -281,17 +280,13 @@
     	};
 
     	//fade in the selection.
-    	if(selectedAirlines.length == 1){
-     		$('#line-'+selectedAirlines[0]).fadeTo('slow', 1);
-			$('.point-'+selectedAirlines[0]).fadeTo('slow', 1);   
-			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseover', tip.show)
-  			 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseout', tip.hide); 	
-    	}else{
-       		$('#line-'+selectedAirlines[1]).fadeTo('slow', 1);
-			$('.point-'+selectedAirlines[1]).fadeTo('slow', 1); 
-			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseover', tip.show)
-  			 d3.selectAll('.point-'+selectedAirlines[1]).on('mouseout', tip.hide); 
-    	}
+ 		$('#line-'+selectedAirlines[0]).fadeTo('slow', 1);  
+ 		if(!animation){
+			$('.point-'+selectedAirlines[0]).fadeTo('slow', 1); 
+		 }
+		 d3.selectAll('.point-'+selectedAirlines[0]).on('mouseover', tip.show)
+		d3.selectAll('.point-'+selectedAirlines[0]).on('mouseout', tip.hide); 	
+   
     }
 
     //toggle the navigation buttons depending on the current selection.
@@ -315,7 +310,6 @@
 
 		//only show the panel if its not already rendered and the animation has ended.
 		if(!animation && $('.info-'+airline).length == 0){
-
 			//dynamically build the panel using attributes in the model.
 			var panel = d3.select('#infoPane')
 				.append('div')
@@ -351,7 +345,8 @@
 		}
     }		
 
-	//draw the stacked bar visualisation to describe business.
+	//draw the stacked bar visualisation to describe busyness. This is displayed on the information bar shown
+	//when an airline is clicked on.
 	function drawStackedBar(data, airline){
 		//set the margin and size of the svg
 		var margin = {top: 5, right: 5 , bottom: 5, left: 5},
@@ -435,7 +430,7 @@
 	}
 
 
-	// draw the main line graph visualisation
+	// draw the main line graph visualisation. 
 	function draw(data){
 
 		//margin and width and height for this viz.
@@ -499,6 +494,7 @@
 	        };
 	    }
 
+	    //find the average delay across all airlines for each period.
 	    var avg_all = d3.nest()
 	       .key(function(d) {
 	          return d.monthofyear;
@@ -532,7 +528,31 @@
 			})
 			.entries(data);	
 
-		//draw the plot
+	   	//rank all airlines in order by their average delay, so that we can step through in order.
+	    airline_rank = d3.nest()
+	    	.key(function(d){
+	    		return d.UniqueCarrier;
+	    	})
+			.rollup(function(leaves){
+				return {
+					"name":leaves[0].Description, 
+					"total_flights":d3.sum(leaves, function(d){return d.flights}),
+					"total_delay":d3.mean(leaves, function(d){return d.avg_total_delay})}})
+			.entries(data);
+
+		airline_rank = _.sortBy(airline_rank, function(d){
+			return d.values.total_delay;
+		});	
+
+		//helper function, return true if this airline is hawain or aloha airlines, since these are treated differently and displayed by default.
+		var isAllohaHawaiin = function(id){
+			if(airline_rank[0].key == id || airline_rank[1].key == id){
+				return true;
+			}
+			return false;
+		}		
+
+		//draw the axis
 		svg.append("g")
 		 	.attr("class", "x axis")
 		 	.attr("transform", "translate(0," + height + ")")
@@ -553,11 +573,24 @@
 			.enter().append("g")
 			.attr("class", "airline");
 
-		//draw a path to represent all points for each airline. By default the line is hidden and when selected or hovered over displays. Onclick select this airline.
+		//draw a path to represent all points for each airline. By default the line is hidden and when selected or hovered over displays. Onclick select this airline. The number one and number two ranked airlines are also always displayed, to higlight these to the user. Whilst the animation is running, prevent the user from selecting other airlines.
 	  	airline.append("path")
-	  		.attr('id', function(d){return "line-"+d.key})
+	  		.attr('id', function(d){
+	  			if(isAllohaHawaiin(d.key)){
+	  				return "line-on"+d.key;
+	  			}else{
+	  		  		return "line-"+d.key			
+	  			}
+	  		})
 	    	.attr("class", "line")
-	    	.style('opacity', 0.05)
+	    	.style('opacity', function(d){
+	    		if(isAllohaHawaiin(d.key)){
+	    			return 1;
+	    		}
+	    		else{
+	    			return 0.05;
+	    		}
+	    	})
 	    	.attr("d", function(d) { 
 	    		return line(d.values); 
 	    	})
@@ -565,9 +598,14 @@
         		return d.values[0].Description;
         	})
 	    	.on('mouseover', function(evt){
-	    		d3.select(this).style('opacity', 1);
+	    		if(!animation){
+	    			d3.select(this).style('opacity', 1);
+	    		}
 	    	})
 	    	.on('mouseout', function(d){
+	    		if(isAllohaHawaiin(d.key)){
+	    			return;
+	    		}
 		    	var ele = d3.select(this);
 		    	if(_.contains(selectedAirlines, d.key)){
 		    		return;
@@ -577,11 +615,26 @@
 		    	}	    			
 	    	})
 	    	.on('click', function(d){
-	    		selectAirline(d.key);
+	    		if(!animation){
+	    	    	selectAirline(d.key);			
+	    		}
 	    	})
 	    	.style("stroke", function(d) { 
 	    		return color(d.key); 
 	    	});
+
+	    	//labels
+	    	airline.append('text')
+	   			.attr('class', 'label')
+	   			.attr('x', 900)
+	   			.attr('y', 340)
+	   			.text('1. Aloha Airlines Inc');
+
+		    airline.append('text')
+	   			.attr('class', 'label')
+	   			.attr('x', 400)
+	   			.attr('y', 350)
+	   			.text('2. Hawaiian Airlines Inc.');   			
 
 	    //draw all points for each airline, by default these are hidden, and are displayed when the airline is selected.
 	    var points = airline.selectAll(".point")
@@ -609,27 +662,12 @@
 	    	.style("stroke-dasharray", "2,4")
 	    	.style('stroke', 'red');
 
+	    //labels
 	   	avg.append('text')
 	   		.attr('class', 'label')
 	   		.attr('x', 1125)
-	   		.attr('y', 200)
+	   		.attr('y', 180)
 	   		.text('Average Delay')
-
-	   	//rank all airlines in order by their average delay, so that we can step through in order.
-	    airline_rank = d3.nest()
-	    	.key(function(d){
-	    		return d.UniqueCarrier;
-	    	})
-			.rollup(function(leaves){
-				return {
-					"name":leaves[0].Description, 
-					"total_flights":d3.sum(leaves, function(d){return d.flights}),
-					"total_delay":d3.mean(leaves, function(d){return d.avg_total_delay})}})
-			.entries(data);
-
-		airline_rank = _.sortBy(airline_rank, function(d){
-			return d.values.total_delay;
-		});
 
         resume();
 	 		
@@ -643,15 +681,15 @@
 		d3.json('data/flight_by_carrier_by_month.json', processData);
 		</script>
 
-		<h1>US Airline Performance (2003 - 2008)</h1>
+		<h1>Aloha and Hawaiian airlines consistenly outperforming rivals when compared by average flight delay. (2003 - 2008)</h1>
 		<div id="navigationButtons" style="display:none">
-			<button id="navPrev" type="button" onclick="navigateToAirline(-1)" title="prev"><</button>
-			<button id="navNext" type="button" onclick="navigateToAirline(1)" title="next">></button>
+			<button id="navPrev" type="button" onclick="navigateToAirline(-1)" title="prev">< PREV</button>
+			<button id="navNext" type="button" onclick="navigateToAirline(1)" title="next">NEXT ></button>
 		</div>
 		<div class='countdownPanel'>
 			<span id="vizRankLabel" class="RankLabel vizRankLabel" style="display:none">Rank</span>
 			<div id='counter' class="vizRankLabel" style="display:none"></div>
-			<div id='airline'>How does your airline compare, as ranked by average flight delay?</div>
+			<div id='airline'>How does your airline compare?</div>
 		</div>
 		<div><button id="skipanimation" onclick="clearAnimation(); $(this).hide()">Skip</button></div>
 
