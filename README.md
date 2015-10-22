@@ -1,5 +1,5 @@
 # Summary
-This visulisation looks at US domestic flight data from 2003 - 2008. It looks at how the performance of different airlines differs offer time. The data has been aggregated by airline by month to reduce the datasets size. In later version I told the user the a story by running through the airlines by rank in an animation, then allowing them to explore the data afterwards. After intial project submission, I delved into the data a bit more and as suggested decided to also bring out the proportion of flights from busy airports, so the user could also compare that with average performance. 
+This visulisation looks at US domestic flight data from 2003 - 2008. It looks at how the performance of different airlines differs offer time, highlighting the 2 series, Hawaiin airlines and Aloha airlines that consistently outperform other airlines. The data has been aggregated by airline by month to reduce the datasets size. In later versions I told the user the a story by running through the airlines by rank in an animation, always keeping the Hawaiin and Aloha airline series visible, then allowing them to explore the data afterwards. I also delved into the data a bit more and as suggested decided to also bring out the proportion of flights from busy airports, so the user could also compare that with average performance. 
 
 #Design 
 1. Dataset.
@@ -26,7 +26,7 @@ I decided to use position on screen as the main encoding of the data, since this
 I did not want to clutter the page too much with axis and legends to distract the user from the main visualisation. When a series is selected a panel is rendered on the screen which gives more information, and is colored in the same colour as the series in the chart to enable the user to associate the two. I decided to use pop up boxes on hover to give the user more information on their selections. This meant that I could give them more information without distracting them from the main information. 
 
 5. Animation
-After my first submission, I decided to hide the information panels when the animation was running, as it was distracting the user, and just include a simple label describing the ranking and airline name. Once the animation was finished the information panels appear, so that the user can then begin exploring the data.
+After my first submission, I decided to hide the information panels when the animation was running, as it was distracting the user, and just include a simple label describing the ranking and airline name. Once the animation was finished the information panels appear, so that the user can then begin exploring the data. I also decided to always keep the Hawaiin and Aloha airlines series displayed, since I wanted to highlight this to the user, as they were extraordinary.
 
 #Feedback
 
@@ -119,6 +119,9 @@ Added navigation buttons
 Added button to skip animation
 Added more comments to code.
 Added code to toggle whether nav button can be triggered.
+
+version 5:
+Tried to emphasise a story about the data more effectivley, since the visualisation was still exploratory rather than explanatory. After the comments by the reviewer decided to bring out the number 1 and 2 ranked airlines because they were significantly different to the others.
 
 #Resources
 list any sources you consulted to create your visualization
